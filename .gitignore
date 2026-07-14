@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[co]
+*.egg-info/
+build/
+dist/
+
+# Secrets
+.env
+.env.*
+
+# OS
+.DS_Store
+
+# Regenerable data / vector store artifacts
+data/vector_store/
+faiss_store/
+chroma_store/
