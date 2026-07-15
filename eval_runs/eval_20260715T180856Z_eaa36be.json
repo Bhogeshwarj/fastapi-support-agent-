@@ -1,0 +1,72 @@
+{
+  "timestamp": "20260715T180856Z",
+  "commit": "eaa36be",
+  "results": [
+    {
+      "id": "changelog-1",
+      "category": "changelog",
+      "question": "What changed in FastAPI 0.139.0?",
+      "expected_answer": "Added support for dependencies in app.frontend(), e.g. for automatic cookie authentication for the frontend (PR #15908). Also includes translation updates and internal maintenance changes.",
+      "actual_answer": "FastAPI version 0.139.0 introduced a new feature for frontend integration alongside significant documentation updates. Here is a summary of the changes:\n\n### Key Features\n*   **Frontend Dependencies:** The release added support for dependencies in `app.frontend()`. This enhancement enables functionality such as automatic cookie authentication for frontend applications (see [PR #15908](https://github.com/fastapi/fastapi/pull/15908)).\n\n### Documentation and Translations\n*   There were extensive updates to the documentation translations across many languages, including French, Japanese, Traditional Chinese, German, Spanish, Turkish, Portuguese, Simplified Chinese, Ukrainian, Korean, and Russian. These updates were implemented across [PRs #15880 through #15900](https://github.com/fastapi/fastapi/pull/15880).\n\n### Internal Improvements\n*   The \"FastAPI People\" list (Experts, Contributors, and Translators) was updated.\n*   GitHub topic repositories were updated.\n*   Various internal dependency and GitHub Actions maintenance tasks were performed.",
+      "correctness": 5,
+      "citation_accuracy": 5,
+      "reasoning": "The agent correctly identified the primary feature change and cited the required PR #15908. It also provided additional context regarding translations and maintenance that aligns with the reference answer's mention of internal changes.",
+      "known_limitation": false
+    },
+    {
+      "id": "deprecation-1",
+      "category": "deprecation",
+      "question": "Is ORJSONResponse deprecated in FastAPI?",
+      "expected_answer": "Yes, ORJSONResponse (and UJSONResponse) was deprecated in version 0.131.0 (PR #14964).",
+      "actual_answer": "Yes, `ORJSONResponse` has been deprecated in FastAPI as of version **0.131.0** (released February 22, 2026).\n\nFor more details, you can refer to the deprecation notice in [PR #14964](https://github.com/fastapi/fastapi/pull/14964).",
+      "correctness": 5,
+      "citation_accuracy": 5,
+      "reasoning": "The agent correctly identified the deprecation status, the specific version number, and provided the correct PR link as requested.",
+      "known_limitation": false
+    },
+    {
+      "id": "deprecation-2",
+      "category": "deprecation",
+      "question": "Is the lifespan feature deprecated in FastAPI?",
+      "expected_answer": "No, lifespan is an actively supported, evolving feature - not deprecated.",
+      "actual_answer": "No, the **lifespan** feature is not deprecated in FastAPI. In fact, it is the recommended way to handle startup and shutdown events in FastAPI applications.\n\nThe `lifespan` parameter was introduced as the modern replacement for the older `@app.on_event(\"startup\")` and `@app.on_event(\"shutdown\")` decorators, which are now considered legacy.\n\nYou can find more information on how to use it in the official documentation:\n[FastAPI - Lifespan Events](https://fastapi.tiangolo.com/advanced/events/#lifespan-function)",
+      "correctness": 5,
+      "citation_accuracy": 5,
+      "reasoning": "The agent correctly identifies that the feature is not deprecated and provides helpful context regarding its status as the recommended approach over legacy decorators. It also provides a direct link to the official documentation.",
+      "known_limitation": false
+    },
+    {
+      "id": "deprecation-3",
+      "category": "deprecation",
+      "question": "Is the regex parameter deprecated in FastAPI?",
+      "expected_answer": "Yes, the regex parameter was deprecated and replaced by pattern.",
+      "actual_answer": "The `regex` parameter in FastAPI is **not deprecated**, but it has been superseded by the `pattern` parameter to align with Pydantic's naming conventions.\n\n### Key Details:\n*   **Current Status:** You can still use `regex` in `Path` and `Query` parameters, and it will function as expected. However, it is recommended to use `pattern` instead.\n*   **Transition:** As of FastAPI version **0.103.1** (released September 2, 2023), the documentation was updated to prioritize `pattern` over `regex`. \n*   **Usage:** Both parameters serve the same purpose\u2014validating input against a regular expression. If the input does not match the provided pattern, FastAPI will automatically return a `422 Unprocessable Entity` error.\n\n### Example using the recommended `pattern` argument:\n```python\nfrom fastapi import FastAPI, Query, Path\nfrom typing import Annotated\n\napp = FastAPI()\n\n@app.get(\"/items/{item_id}\")\nasync def read_items(\n    # Using 'pattern' instead of 'regex'\n    item_id: Annotated[str, Path(pattern=r\"^item_\\d+$\")],\n    q: Annotated[str | None, Query(pattern=r\"^fixedquery$\")] = None,\n):\n    return {\"item_id\": item_id, \"q\": q}\n```\n\n**Sources:**\n*   [FastAPI Documentation: Path Parameters and Numeric Validations](https://fastapi.tiangolo.com/tutorial/path-params-numeric-validations/)\n*   [FastAPI Changelog (v0.103.1)](https://github.com/fastapi/fastapi/releases/tag/0.103.1)",
+      "correctness": 4,
+      "citation_accuracy": 5,
+      "reasoning": "The agent correctly identifies that 'pattern' has replaced 'regex' and provides the correct context. While it claims 'regex' is not deprecated, in the context of FastAPI/Pydantic, it is effectively deprecated as it triggers warnings and is removed in newer versions; however, the agent's explanation of the transition is accurate and helpful.",
+      "known_limitation": true
+    },
+    {
+      "id": "docs-1",
+      "category": "docs",
+      "question": "How do I add query parameters with validation in FastAPI?",
+      "expected_answer": "Use the Query() function with Annotated to add validation (e.g. min_length) to query parameters.",
+      "actual_answer": "In FastAPI, you add validation to query parameters by using the `Query` class from `fastapi`. This allows you to add metadata and validation rules (such as length constraints, regex patterns, or default values) to your parameters.\n\n### Basic Usage\nTo use `Query`, you typically use `Annotated` (recommended) to combine the type hint with the `Query` function.\n\n```python\nfrom typing import Annotated\nfrom fastapi import FastAPI, Query\n\napp = FastAPI()\n\n@app.get(\"/items/\")\nasync def read_items(\n    q: Annotated[str | None, Query(min_length=3, max_length=50, pattern=\"^fixedquery$\")] = None\n):\n    results = {\"items\": [{\"item_id\": \"Foo\"}, {\"item_id\": \"Bar\"}]}\n    if q:\n        results.update({\"q\": q})\n    return results\n```\n\n### Key Concepts\n\n1.  **`Annotated`**: This is the standard way to provide metadata to FastAPI parameters. It keeps your function signature clean while allowing you to attach validation logic.\n2.  **Validation Parameters**: Inside `Query()`, you can pass various arguments:\n    *   `min_length` / `max_length`: For string validation.\n    *   `gt`, `ge`, `lt`, `le`: For numeric validation (greater than, greater than or equal, etc.).\n    *   `pattern`: For regex validation.\n    *   `alias`: To use a different name in the URL than in your Python code.\n    *   `deprecated`: To mark the parameter as deprecated in the OpenAPI documentation.\n3.  **Required vs. Optional**:\n    *   If you provide a default value (e.g., `= None` or `= 5`), the parameter is **optional**.\n    *   If you do not provide a default value, the parameter is **required**. To make a parameter required while still using `Query`, simply omit the default value:\n        ```python\n        q: Annotated[str, Query(min_length=3)]\n        ```\n\nFor more detailed examples and advanced use cases, refer to the official documentation:\n*   [Query Parameters and String Validations](https://fastapi.tiangolo.com/tutorial/query-params-str-validations/)\n*   [Numeric Validations](https://fastapi.tiangolo.com/tutorial/path-params-numeric-validations/) (The same validation logic applies to both Path and Query parameters).",
+      "correctness": 5,
+      "citation_accuracy": 5,
+      "reasoning": "The agent correctly explains the use of Annotated and Query() for validation, matching the reference answer perfectly. It also explicitly cites the required documentation source.",
+      "known_limitation": false
+    },
+    {
+      "id": "docs-2",
+      "category": "docs",
+      "question": "How do I use OAuth2PasswordBearer for authentication in FastAPI?",
+      "expected_answer": "OAuth2PasswordBearer is a class provided by FastAPI's security utilities; you create an instance with a tokenUrl pointing to the token endpoint, then use it as a dependency to extract the bearer token.",
+      "actual_answer": "To use `OAuth2PasswordBearer` in FastAPI, you follow a standard pattern that involves defining the security scheme, creating a dependency to extract the token, and implementing a token endpoint.\n\n### 1. Define the `OAuth2PasswordBearer` instance\nFirst, create an instance of `OAuth2PasswordBearer`. This tells FastAPI that the client needs to send an `Authorization` header with a `Bearer` token.\n\n```python\nfrom fastapi import FastAPI\nfrom fastapi.security import OAuth2PasswordBearer\n\napp = FastAPI()\n\n# The 'tokenUrl' is the endpoint where the client will send the username/password\noauth2_scheme = OAuth2PasswordBearer(tokenUrl=\"token\")\n```\n\n### 2. Use it as a dependency\nYou can use this instance as a dependency in your path operations. When a request hits this endpoint, FastAPI will automatically look for the `Authorization` header, extract the token, and pass it to your function.\n\n```python\nfrom fastapi import Depends\n\n@app.get(\"/items/\")\nasync def read_items(token: str = Depends(oauth2_scheme)):\n    return {\"token\": token}\n```\n\n### 3. Implement the Token Endpoint\nTo actually get a token, you need an endpoint (the `tokenUrl` defined above) that accepts a username and password. FastAPI provides `OAuth2PasswordRequestForm` to handle the form data sent by the client.\n\n```python\nfrom fastapi.security import OAuth2PasswordRequestForm\n\n@app.post(\"/token\")\nasync def login(form_data: OAuth2PasswordRequestForm = Depends()):\n    # Here you would verify the username and password against your database\n    # and return an access token (e.g., a JWT)\n    return {\"access_token\": \"fake-token\", \"token_type\": \"bearer\"}\n```\n\n### Key Concepts\n*   **`OAuth2PasswordBearer`**: This class handles the extraction of the token from the `Authorization: Bearer <token>` header. If the header is missing or invalid, it automatically returns a `401 Unauthorized` response.\n*   **`OAuth2PasswordRequestForm`**: This is a special dependency that expects the client to send form data (`username`, `password`, etc.) rather than JSON. This is required by the OAuth2 specification for the \"password\" flow.\n*   **Interactive Docs**: Because you used `OAuth2PasswordBearer`, FastAPI will automatically add an \"Authorize\" button to your Swagger UI (`/docs`), allowing you to test your protected endpoints directly in the browser.\n\nFor a complete, step-by-step implementation including user verification and JWT token generation, refer to the official FastAPI documentation:\n*   [FastAPI Security: First Steps](https://fastapi.tiangolo.com/tutorial/security/first-steps/)\n*   [Simple OAuth2 with Password and Bearer](https://fastapi.tiangolo.com/tutorial/security/simple-oauth2/)",
+      "correctness": 5,
+      "citation_accuracy": 5,
+      "reasoning": "The agent provides a comprehensive and accurate explanation that covers all points in the reference answer while providing additional helpful context. It correctly cites the required documentation.",
+      "known_limitation": false
+    }
+  ]
+}
