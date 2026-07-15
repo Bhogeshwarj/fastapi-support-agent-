@@ -2,44 +2,45 @@
 
 ## System diagram: LangGraph shape, and where gateway/eval/guardrails sit
 
+**As actually built (M5/M6), not the original guess:**
+
 ```mermaid
 flowchart TD
-    U[User query] --> IG[Input guardrail - M8]
-    IG -->|blocked: off-topic / injection| REJ[Refusal response]
-    IG -->|passed| P[Planner / router node - M6]
+    U[User query] --> IG[Input guardrail - M8, not yet built]
+    IG --> PL[planner node - M6]
 
-    P -->|single tool call needed| T{Tool selection}
-    P -->|multi-part question| SA[Sub-agent delegation - M6]
-    SA --> T
+    PL -->|simple, single-topic| AG[agent node - M5]
+    PL -->|multi-part question| DS[dispatch_subagents - M6]
 
-    T --> RAG[RAG retrieval tool - M3]
-    T --> CL[Changelog / deprecation tool - M4]
-    T --> IS[GitHub issue search tool - M4, live API]
+    AG <--> TN[tools node - M5\nall 4 tools]
+    AG -->|final answer, no more tool calls| HITL
 
-    RAG --> AGG[Aggregate + synthesize with citations]
-    CL --> AGG
-    IS --> AGG
+    DS -->|one isolated sub-agent per sub-task,\neach scoped to only its domain's tools| AGGR[aggregate node - M6]
+    AGGR --> HITL[hitl_check node - M5]
 
-    AGG -->|claim needs approval| HITL[Human-in-the-loop checkpoint - M5]
-    HITL -->|approved| OG
-    AGG -->|no approval needed| OG[Output guardrail - M8]
-    OG --> RESP[Final response]
+    HITL -->|risky claim: interrupt for approval| APPR{human approves?}
+    APPR -->|yes| RESP[Final response]
+    APPR -->|no, edited| RESP
+    HITL -->|not risky, passthrough| RESP
+
+    RESP --> OG[Output guardrail - M8, not yet built]
 
     GW["LLM Gateway - M2 (provider fallback, cost tracking)"]
-    GW -. wraps every model call .-> P
-    GW -. wraps every model call .-> AGG
-    GW -. wraps every model call .-> HITL
+    GW -. wraps every model call .-> PL
+    GW -. wraps every model call .-> AG
+    GW -. wraps every model call .-> AGGR
 
     EVAL["Eval harness - M7 (offline: golden set + LLM-as-judge)"]
     EVAL -. runs the whole graph, scores .-> RESP
 ```
 
 **How to read this:**
-- The graph itself (nodes/edges) is built in **M5** (basic router + tool-calling) and extended in **M6** (the sub-agent delegation branch, for questions that need more than one tool).
-- The **gateway (M2)** isn't a node in the graph — it's a wrapper every node's LLM call goes through, which is exactly why we're building it *before* the graph exists: nothing needs retrofitting.
-- **Guardrails (M8)** sit at the two edges of the graph — input (before the planner ever sees the query) and output (before the response leaves) — not scattered through the middle.
-- **HITL (M5)** is one specific interrupt point: before the agent finalizes an answer that asserts something risky (a deprecation/breaking-change claim, or before it spends GitHub API quota on an ambiguous issue search). Not every response pauses for approval — just the ones matching that condition.
-- **Eval (M7)** never runs inside this live request graph — it's a separate offline harness that replays the golden Q&A set through the same graph and scores the output afterward.
+- **`planner` (M6)** is the real entry point, not a router that sits beside the loop - it decides up front whether the question is simple (one topic) or needs decomposition.
+- **Simple path**: `agent` \<-\> `tools` is exactly the M5 ReAct loop - the LLM picks a tool, sees the result, decides whether to call another or answer. This already handles *some* multi-tool questions on its own (parallel tool calls in one turn), which is why the planner only delegates when a question has genuinely distinct parts.
+- **Delegation path**: each sub-task in the plan gets its own `create_agent()` instance with a **fresh, isolated message history** and only the tools relevant to its domain (docs / changelog / issues) - it never sees the other sub-agents' work. `aggregate` is the one node that reads all sub-agent outputs together and writes the combined answer.
+- **`hitl_check` (M5)** is shared by both paths - one interrupt point regardless of which route produced the draft answer.
+- **Gateway (M2)** coverage gap, found while building M6: `dispatch_subagents` calls `create_agent(model=llm, ...)`, which invokes the LLM directly inside LangGraph's prebuilt loop - **not** through our `gateway_invoke()` wrapper. So sub-agent LLM calls still get fallback + rate-limiting (those are baked into the `ChatGroq`/`ChatGoogleGenerativeAI` objects themselves), but they bypass our cost/usage logging in `data/usage_log.jsonl`. Not yet fixed - worth revisiting before M9 production monitoring, since usage numbers would currently undercount real spend once delegation is used.
+- **Guardrails (M8)** and **Eval (M7)** are unbuilt - shown here as their intended position, not implemented yet.
 
 ## Repo layout
 
