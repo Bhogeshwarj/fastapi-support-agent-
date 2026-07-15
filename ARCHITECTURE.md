@@ -1,5 +1,46 @@
 # Architecture (M1)
 
+## System diagram: LangGraph shape, and where gateway/eval/guardrails sit
+
+```mermaid
+flowchart TD
+    U[User query] --> IG[Input guardrail - M8]
+    IG -->|blocked: off-topic / injection| REJ[Refusal response]
+    IG -->|passed| P[Planner / router node - M6]
+
+    P -->|single tool call needed| T{Tool selection}
+    P -->|multi-part question| SA[Sub-agent delegation - M6]
+    SA --> T
+
+    T --> RAG[RAG retrieval tool - M3]
+    T --> CL[Changelog / deprecation tool - M4]
+    T --> IS[GitHub issue search tool - M4, live API]
+
+    RAG --> AGG[Aggregate + synthesize with citations]
+    CL --> AGG
+    IS --> AGG
+
+    AGG -->|claim needs approval| HITL[Human-in-the-loop checkpoint - M5]
+    HITL -->|approved| OG
+    AGG -->|no approval needed| OG[Output guardrail - M8]
+    OG --> RESP[Final response]
+
+    GW["LLM Gateway - M2 (provider fallback, cost tracking)"]
+    GW -. wraps every model call .-> P
+    GW -. wraps every model call .-> AGG
+    GW -. wraps every model call .-> HITL
+
+    EVAL["Eval harness - M7 (offline: golden set + LLM-as-judge)"]
+    EVAL -. runs the whole graph, scores .-> RESP
+```
+
+**How to read this:**
+- The graph itself (nodes/edges) is built in **M5** (basic router + tool-calling) and extended in **M6** (the sub-agent delegation branch, for questions that need more than one tool).
+- The **gateway (M2)** isn't a node in the graph — it's a wrapper every node's LLM call goes through, which is exactly why we're building it *before* the graph exists: nothing needs retrofitting.
+- **Guardrails (M8)** sit at the two edges of the graph — input (before the planner ever sees the query) and output (before the response leaves) — not scattered through the middle.
+- **HITL (M5)** is one specific interrupt point: before the agent finalizes an answer that asserts something risky (a deprecation/breaking-change claim, or before it spends GitHub API quota on an ambiguous issue search). Not every response pauses for approval — just the ones matching that condition.
+- **Eval (M7)** never runs inside this live request graph — it's a separate offline harness that replays the golden Q&A set through the same graph and scores the output afterward.
+
 ## Repo layout
 
 ```
