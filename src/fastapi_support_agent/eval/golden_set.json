@@ -62,6 +62,7 @@
     "category": "multi-part",
     "expected_answer": "0.139.0 added app.frontend() dependency support (PR #15908); no GitHub issues currently reference app.frontend() specifically.",
     "expected_sources": ["15908"],
-    "known_limitation": false
+    "known_limitation": true,
+    "known_limitation_note": "The issues sub-agent, finding zero GitHub issues about a very recent feature, sometimes falls back on its own outdated training belief that FastAPI 'hasn't reached 0.139.0 yet' and asserts the feature doesn't exist - contradicting its own changelog sub-agent's correct finding. A grounding instruction (GROUNDING_INSTRUCTION in agents/graph.py) was added to reduce this, and measurably helps in some runs, but does not reliably eliminate it - confirmed by re-running this exact case twice with different outcomes. Included so the eval honestly tracks this instability rather than hiding it."
   }
 ]

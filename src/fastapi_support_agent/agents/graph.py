@@ -39,13 +39,27 @@ SUBAGENT_TOOLS = {
     "issues": [search_github_issues],
 }
 
+# Found via eval: a sub-agent once declared FastAPI "hasn't reached version
+# 0.139.0" using its own outdated training knowledge, contradicting its own
+# tool's correct output. This instruction exists specifically to prevent that
+# failure mode - always trust tool output over pretrained assumptions.
+GROUNDING_INSTRUCTION = (
+    "Your training data has a cutoff and may be outdated about FastAPI's "
+    "current version, features, or changelog - always trust tool output over "
+    "your own prior knowledge. If a tool returns no results, state plainly "
+    "that none were found. Never conclude that a tool's data must be wrong "
+    "or that the question's premise is false just because it conflicts with "
+    "what you already believe."
+)
+
 SYSTEM_PROMPT = (
     "You are a support assistant for the FastAPI web framework. Use the "
     "available tools to answer questions accurately - search the docs for "
     "conceptual questions, the changelog tools for version/deprecation "
     "questions, and GitHub issue search for bug reports. Cite sources "
     "(doc URLs, PR links, issue links) in your final answer. If you don't "
-    "have enough information after using the tools, say so plainly."
+    "have enough information after using the tools, say so plainly. "
+    + GROUNDING_INSTRUCTION
 )
 
 # Claims this risky get held for human approval before the answer is returned.
@@ -162,7 +176,12 @@ def build_agent_graph():
         subtasks = state["plan"]["subtasks"]
         results = []
         for subtask in subtasks:
-            subagent = create_agent(model=llm, tools=SUBAGENT_TOOLS[subtask["subagent"]])
+            subagent = create_agent(
+                model=llm,
+                tools=SUBAGENT_TOOLS[subtask["subagent"]],
+                system_prompt=f"You are a {subtask['subagent']} specialist for FastAPI "
+                f"support. Answer using your tool. {GROUNDING_INSTRUCTION}",
+            )
             sub_result = subagent.invoke({"messages": [HumanMessage(content=subtask["task"])]})
             final_message = sub_result["messages"][-1]
             results.append(f"[{subtask['subagent']}] {subtask['task']}\n-> {final_message.content}")
@@ -174,7 +193,11 @@ def build_agent_graph():
         messages = [
             SystemMessage(
                 content=SYSTEM_PROMPT + " Combine the sub-agent findings below into one "
-                "coherent, cited answer to the original question."
+                "coherent, cited answer to the original question. If findings from "
+                "different sub-agents seem to disagree, prefer whichever finding is "
+                "backed by an actual tool result (a citation/link/PR number) over one "
+                "that isn't - a sub-agent asserting something without a citation is "
+                "more likely to be wrong than one that cites its source."
             ),
             HumanMessage(content=f"Original question: {question}\n\nSub-agent findings:\n\n{combined}"),
         ]
