@@ -69,10 +69,21 @@ fastapi-support-agent/
 
 Why issues aren't bulk-fetched like the docs: there are tens of thousands of them, and what makes them useful for support is current state, not a stale snapshot. Docs and the changelog are effectively immutable at a point in time, so a snapshot is fine there.
 
-## Vector store
+## Retrieval pipeline (M3)
 
-**Chroma** — embedded, persists to disk automatically, and every chunk carries metadata (source file, URL, section) alongside its embedding, which hybrid search and citations both depend on. Chosen over FAISS (used previously in `RAG-Tutorials`) specifically for that built-in metadata/persistence story.
+- **Chunking** (`rag/chunking.py`) — two-stage split: `MarkdownHeaderTextSplitter` first (so every chunk knows its section), then `RecursiveCharacterTextSplitter` within each section (so chunk sizes are consistent, ~800 chars). Internal-only files (leading underscore, e.g. `_llm-test.md`) and `release-notes.md` are excluded — the changelog gets its own structured parser in M4. Each chunk carries `source_file`, `section`, and a `url` mapped back to the live `fastapi.tiangolo.com` site (not the GitHub repo). 1,595 chunks from the current corpus.
+- **Embeddings** — local, via `langchain-huggingface`'s `HuggingFaceEmbeddings` running `sentence-transformers/all-MiniLM-L6-v2`. Chosen over an API-based embedding provider (e.g. Gemini's) specifically because indexing thousands of chunks would burn through a free-tier request quota fast — local embedding is unlimited and genuinely free forever.
+- **Vector store** (`scripts/build_index.py`) — **Chroma**, persisted to `data/vector_store/chroma/` (gitignored, rebuilt from raw docs on demand). Chosen over FAISS (used previously in `RAG-Tutorials`) because every chunk's metadata travels with its embedding, which hybrid search and citations both depend on.
+- **Hybrid search** (`rag/retrieval.py`, `build_hybrid_retriever`) — Chroma vector search + `BM25Retriever` (keyword matching, good at exact terms like class names) merged via `EnsembleRetriever`, which uses Reciprocal Rank Fusion. Returns the union of both retrievers' results, not trimmed to a fixed count.
+- **Reranking** (`rag/retrieval.py`, `build_reranked_retriever`) — the merged hybrid candidates get rescored by a cross-encoder (`cross-encoder/ms-marco-MiniLM-L-6-v2`, local, via `HuggingFaceCrossEncoder` + `CrossEncoderReranker`), then trimmed to a final `top_n`. Added after testing showed the raw hybrid merge included some weak keyword-only matches that a query+document-aware model correctly demotes.
+- **Not yet built**: the synthesis step that takes reranked chunks + the user's question and calls `gateway_invoke()` to produce an actual cited answer. Retrieval returns chunks today, not answers.
+
+Package note: in LangChain's v1 reorg, `EnsembleRetriever`, `ContextualCompressionRetriever`, and `CrossEncoderReranker` all moved out of the main `langchain` package into a separate `langchain-classic` package — found by testing imports directly rather than trusting older docs/tutorials.
 
 ## Dependency management
 
-`uv`-managed project, Python 3.13. Every dependency added via `uv add` so versions are resolved live against PyPI and locked in `uv.lock` — no hand-typed version guesses. Current core deps: `langchain==1.3.13`, `langgraph==1.2.9`, `langsmith==0.10.3`, `chromadb==1.5.9`, `langchain-chroma==1.1.0`.
+`uv`-managed project, Python 3.13. Every dependency added via `uv add` so versions are resolved live against PyPI and locked in `uv.lock` — no hand-typed version guesses. Current core deps: `langchain==1.3.13`, `langgraph==1.2.9`, `langsmith==0.10.3`, `chromadb==1.5.9`, `langchain-chroma==1.1.0`, `langchain-groq`, `langchain-google-genai`, `langchain-huggingface`, `sentence-transformers`, `langchain-community`, `rank-bm25`.
+
+## Open decisions
+
+- **Automated tests**: everything so far has been verified with manual smoke-test scripts (`scripts/test_gateway.py`, ad-hoc checks), not a `pytest` suite, even though `tests/` exists in the repo layout. M7's eval harness will be the main quality gate for RAG/agent behavior — not yet decided whether a lightweight `pytest` suite runs alongside it for the non-LLM plumbing (chunking, URL mapping, gateway fallback logic).
