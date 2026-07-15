@@ -68,7 +68,10 @@ class Plan(BaseModel):
 
 class AgentState(TypedDict):
     messages: Annotated[list, add_messages]
-    plan: Plan | None
+    # Stored as a plain dict, not the Plan Pydantic model - LangGraph's
+    # checkpointer warns that persisting arbitrary custom types will be
+    # blocked in a future version unless explicitly registered.
+    plan: dict | None
     subagent_results: list[str]
 
 
@@ -89,11 +92,11 @@ def build_agent_graph():
                 HumanMessage(content=question),
             ]
         )
-        return {"plan": plan}
+        return {"plan": plan.model_dump()}
 
     def route_after_planner(state: AgentState) -> str:
         plan = state.get("plan")
-        if plan and plan.needs_delegation and plan.subtasks:
+        if plan and plan.get("needs_delegation") and plan.get("subtasks"):
             return "dispatch_subagents"
         return "agent"
 
@@ -111,13 +114,13 @@ def build_agent_graph():
         return "hitl_check"
 
     def dispatch_subagents(state: AgentState) -> dict:
-        plan: Plan = state["plan"]
+        subtasks = state["plan"]["subtasks"]
         results = []
-        for subtask in plan.subtasks:
-            subagent = create_agent(model=llm, tools=SUBAGENT_TOOLS[subtask.subagent])
-            sub_result = subagent.invoke({"messages": [HumanMessage(content=subtask.task)]})
+        for subtask in subtasks:
+            subagent = create_agent(model=llm, tools=SUBAGENT_TOOLS[subtask["subagent"]])
+            sub_result = subagent.invoke({"messages": [HumanMessage(content=subtask["task"])]})
             final_message = sub_result["messages"][-1]
-            results.append(f"[{subtask.subagent}] {subtask.task}\n-> {final_message.content}")
+            results.append(f"[{subtask['subagent']}] {subtask['task']}\n-> {final_message.content}")
         return {"subagent_results": results}
 
     def aggregate_node(state: AgentState) -> dict:
