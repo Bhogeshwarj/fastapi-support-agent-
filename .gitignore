@@ -12,7 +12,5 @@ dist/
 # OS
 .DS_Store
 
-# Regenerable data / vector store artifacts
-data/vector_store/
-faiss_store/
-chroma_store/
+# Regenerable data / vector store artifacts (rebuild via scripts/)
+data/
