@@ -1,0 +1,67 @@
+[
+  {
+    "id": "changelog-1",
+    "question": "What changed in FastAPI 0.139.0?",
+    "category": "changelog",
+    "expected_answer": "Added support for dependencies in app.frontend(), e.g. for automatic cookie authentication for the frontend (PR #15908). Also includes translation updates and internal maintenance changes.",
+    "expected_sources": ["15908"],
+    "known_limitation": false
+  },
+  {
+    "id": "deprecation-1",
+    "question": "Is ORJSONResponse deprecated in FastAPI?",
+    "category": "deprecation",
+    "expected_answer": "Yes, ORJSONResponse (and UJSONResponse) was deprecated in version 0.131.0 (PR #14964).",
+    "expected_sources": ["14964", "0.131.0"],
+    "known_limitation": false
+  },
+  {
+    "id": "deprecation-2",
+    "question": "Is the lifespan feature deprecated in FastAPI?",
+    "category": "deprecation",
+    "expected_answer": "No, lifespan is an actively supported, evolving feature - not deprecated.",
+    "expected_sources": [],
+    "known_limitation": false
+  },
+  {
+    "id": "deprecation-3",
+    "question": "Is the regex parameter deprecated in FastAPI?",
+    "category": "deprecation",
+    "expected_answer": "Yes, the regex parameter was deprecated and replaced by pattern.",
+    "expected_sources": ["pattern"],
+    "known_limitation": true,
+    "known_limitation_note": "changelog.py's parser only captures bullets with a 'PR [#N](url) by [@author]' suffix. This deprecation is recorded in an old-format bullet (pre-PR-attribution era) without that suffix, so check_deprecated currently misses it and answers incorrectly. Included deliberately so the eval honestly reports this gap."
+  },
+  {
+    "id": "docs-1",
+    "question": "How do I add query parameters with validation in FastAPI?",
+    "category": "docs",
+    "expected_answer": "Use the Query() function with Annotated to add validation (e.g. min_length) to query parameters.",
+    "expected_sources": ["query-params-str-validations"],
+    "known_limitation": false
+  },
+  {
+    "id": "docs-2",
+    "question": "How do I use OAuth2PasswordBearer for authentication in FastAPI?",
+    "category": "docs",
+    "expected_answer": "OAuth2PasswordBearer is a class provided by FastAPI's security utilities; you create an instance with a tokenUrl pointing to the token endpoint, then use it as a dependency to extract the bearer token.",
+    "expected_sources": ["tutorial/security/first-steps"],
+    "known_limitation": false
+  },
+  {
+    "id": "issues-1",
+    "question": "Has anyone reported issues with lifespan startup/shutdown events not firing?",
+    "category": "issues",
+    "expected_answer": "Yes, there are historical GitHub issues about startup/shutdown event handling (e.g. issue #617, #811, #2943).",
+    "expected_sources": ["github.com/fastapi/fastapi/issues"],
+    "known_limitation": false
+  },
+  {
+    "id": "multi-1",
+    "question": "What changed in FastAPI 0.139.0, and has anyone reported issues with the app.frontend() feature added in it?",
+    "category": "multi-part",
+    "expected_answer": "0.139.0 added app.frontend() dependency support (PR #15908); no GitHub issues currently reference app.frontend() specifically.",
+    "expected_sources": ["15908"],
+    "known_limitation": false
+  }
+]
