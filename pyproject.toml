@@ -1,9 +1,9 @@
 [project]
 name = "fastapi-support-agent"
 version = "0.1.0"
-description = "Add your description here"
+description = "A support/ops agent for FastAPI: hybrid-search doc RAG with citations, changelog/deprecation lookup, GitHub issue search, LangGraph multi-agent orchestration with human-in-the-loop approval, and an eval/guardrail/gateway layer."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 dependencies = [
     "chromadb>=1.5.9",
     "langchain>=1.3.13",
