@@ -34,4 +34,11 @@ EXPOSE 8000
 # instead; search_fastapi_docs (tools/docs_search.py) checks whether the
 # corpus/index exist yet and returns a friendly "still initializing" message
 # for the small window between container start and that job finishing.
-CMD ["sh", "-c", "(uv run scripts/fetch_docs.py && uv run scripts/build_index.py) & uv run uvicorn fastapi_support_agent.api.main:app --app-dir src --host 0.0.0.0 --port ${PORT}"]
+# --no-sync on every runtime `uv run`: without it, uv takes an environment
+# lock to check/sync the venv before running anything - two concurrent
+# `uv run` processes (the background job and uvicorn) then contend on that
+# same lock, so uvicorn silently blocks until the background job finishes,
+# reproducing the exact same port-scan timeout (confirmed via a real deploy
+# that still timed out after backgrounding). The venv was already synced
+# with --frozen at build time, so no runtime sync is needed anyway.
+CMD ["sh", "-c", "(uv run --no-sync scripts/fetch_docs.py && uv run --no-sync scripts/build_index.py) & uv run --no-sync uvicorn fastapi_support_agent.api.main:app --app-dir src --host 0.0.0.0 --port ${PORT}"]
