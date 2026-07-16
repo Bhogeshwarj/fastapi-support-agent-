@@ -6,8 +6,9 @@
 
 ```mermaid
 flowchart TD
-    U[User query] --> IG[Input guardrail - M8, not yet built]
-    IG --> PL[planner node - M6]
+    U[User query] --> IG[input_guardrail node - M8]
+    IG -->|off-topic or unsafe| BR[blocked_response] --> RESP2[Final response]
+    IG -->|on-topic and safe| PL[planner node - M6]
 
     PL -->|simple, single-topic| AG[agent node - M5]
     PL -->|multi-part question| DS[dispatch_subagents - M6]
@@ -19,28 +20,32 @@ flowchart TD
     AGGR --> HITL[hitl_check node - M5]
 
     HITL -->|risky claim: interrupt for approval| APPR{human approves?}
-    APPR -->|yes| RESP[Final response]
-    APPR -->|no, edited| RESP
-    HITL -->|not risky, passthrough| RESP
+    APPR -->|yes| OG
+    APPR -->|no, edited| OG
+    HITL -->|not risky, passthrough| OG[output_guardrail node - M8]
 
-    RESP --> OG[Output guardrail - M8, not yet built]
+    OG -->|leak/unsafe content detected| BLOCKED[Generic refusal] --> RESP[Final response]
+    OG -->|safe| RESP
 
     GW["LLM Gateway - M2 (provider fallback, cost tracking)"]
     GW -. wraps every model call .-> PL
     GW -. wraps every model call .-> AG
     GW -. wraps every model call .-> AGGR
+    GW -. wraps every model call .-> IG
+    GW -. wraps every model call .-> OG
 
     EVAL["Eval harness - M7 (offline: golden set + LLM-as-judge)"]
     EVAL -. runs the whole graph, scores .-> RESP
 ```
 
 **How to read this:**
-- **`planner` (M6)** is the real entry point, not a router that sits beside the loop - it decides up front whether the question is simple (one topic) or needs decomposition.
+- **`input_guardrail` (M8)** runs an LLM classifier (`GuardrailVerdict`) on the raw question before the planner ever sees it. Off-topic or unsafe questions short-circuit straight to a canned refusal, bypassing the planner/agent/tools entirely.
+- **`planner` (M6)** is the real entry point after the guardrail passes - it decides up front whether the question is simple (one topic) or needs decomposition.
 - **Simple path**: `agent` \<-\> `tools` is exactly the M5 ReAct loop - the LLM picks a tool, sees the result, decides whether to call another or answer. This already handles *some* multi-tool questions on its own (parallel tool calls in one turn), which is why the planner only delegates when a question has genuinely distinct parts.
 - **Delegation path**: each sub-task in the plan gets its own `create_agent()` instance with a **fresh, isolated message history** and only the tools relevant to its domain (docs / changelog / issues) - it never sees the other sub-agents' work. `aggregate` is the one node that reads all sub-agent outputs together and writes the combined answer.
 - **`hitl_check` (M5)** is shared by both paths - one interrupt point regardless of which route produced the draft answer.
+- **`output_guardrail` (M8)** runs *after* HITL, on whatever the final answer ends up being (approved, edited, or passed straight through) - a second LLM classifier (`OutputGuardrailVerdict`) checking for leaked system/internal instructions or unsafe content, distinct from HITL's narrower deprecation-claim check and the injection defense's narrower tool-output-trust check. Verified it actually discriminates: a normal technical answer passes, a simulated system-prompt leak gets blocked.
 - **Gateway (M2)** coverage gap, found while building M6: `dispatch_subagents` calls `create_agent(model=llm, ...)`, which invokes the LLM directly inside LangGraph's prebuilt loop - **not** through our `gateway_invoke()` wrapper. So sub-agent LLM calls still get fallback + rate-limiting (those are baked into the `ChatGroq`/`ChatGoogleGenerativeAI` objects themselves), but they bypass our cost/usage logging in `data/usage_log.jsonl`. Not yet fixed - worth revisiting before M9 production monitoring, since usage numbers would currently undercount real spend once delegation is used.
-- **Guardrails (M8)** and **Eval (M7)** are unbuilt - shown here as their intended position, not implemented yet.
 
 ## Repo layout
 
