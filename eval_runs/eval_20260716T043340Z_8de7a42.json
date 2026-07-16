@@ -1,0 +1,94 @@
+{
+  "timestamp": "20260716T043340Z",
+  "commit": "8de7a42",
+  "results": [
+    {
+      "id": "changelog-1",
+      "category": "changelog",
+      "question": "What changed in FastAPI 0.139.0?",
+      "expected_answer": "Added support for dependencies in app.frontend(), e.g. for automatic cookie authentication for the frontend (PR #15908). Also includes translation updates and internal maintenance changes.",
+      "actual_answer": "According to the changelog, FastAPI 0.139.0 introduced several changes, including:\n* Support for dependencies in `app.frontend()`\n* Updates to translations for various languages\n* Internal updates, such as bumping the github-actions group and python-packages group.\n\nFor more information, you can refer to the official FastAPI documentation and changelog. Unfortunately, I couldn't find a direct link to the specific changelog entry for FastAPI 0.139.0. However, you can check the official FastAPI documentation (https://fastapi.tiangolo.com/) and GitHub repository (https://github.com/tiangolo/fastapi) for the most up-to-date information on changes and updates.",
+      "correctness": 5,
+      "citation_accuracy": 4,
+      "reasoning": "The agent's answer conveys the same key facts as the reference answer, including support for dependencies in app.frontend() and translation updates. However, it does not directly cite the specific PR #15908, but instead provides general references to the official FastAPI documentation and GitHub repository, which is why citation_accuracy is 4 instead of 5.",
+      "known_limitation": false
+    },
+    {
+      "id": "deprecation-1",
+      "category": "deprecation",
+      "question": "Is ORJSONResponse deprecated in FastAPI?",
+      "expected_answer": "Yes, ORJSONResponse (and UJSONResponse) was deprecated in version 0.131.0 (PR #14964).",
+      "actual_answer": "ORJSONResponse is deprecated in FastAPI as of version 0.131.0. It is recommended to use a Response Model instead for better performance.",
+      "correctness": 5,
+      "citation_accuracy": 4,
+      "reasoning": "The answer is fully correct as it states that ORJSONResponse is deprecated in FastAPI as of version 0.131.0, which matches the reference answer. However, it does not explicitly cite the PR #14964, which is the expected source, resulting in a citation accuracy score of 4.",
+      "known_limitation": false
+    },
+    {
+      "id": "deprecation-2",
+      "category": "deprecation",
+      "question": "Is the lifespan feature deprecated in FastAPI?",
+      "expected_answer": "No, lifespan is an actively supported, evolving feature - not deprecated.",
+      "actual_answer": "The lifespan feature in FastAPI is not deprecated. According to the changelog, there have been several updates and fixes related to lifespan, but no deprecation or removal notices have been found.",
+      "correctness": 5,
+      "citation_accuracy": 5,
+      "reasoning": "The agent's answer correctly conveys that the lifespan feature is not deprecated and cites the changelog as evidence, which is a relevant and reliable source.",
+      "known_limitation": false
+    },
+    {
+      "id": "deprecation-3",
+      "category": "deprecation",
+      "question": "Is the regex parameter deprecated in FastAPI?",
+      "expected_answer": "Yes, the regex parameter was deprecated and replaced by pattern.",
+      "actual_answer": "Based on the search results, it appears that the `regex` parameter is not deprecated in FastAPI. The changelog mentions several instances where `regex` is used, but none of them indicate deprecation or removal. Therefore, it is likely that the `regex` parameter is still supported in FastAPI.",
+      "correctness": 1,
+      "citation_accuracy": 1,
+      "reasoning": "The agent's answer is incorrect because it contradicts the reference answer, and it does not cite the expected source, which is the pattern parameter.",
+      "known_limitation": true
+    },
+    {
+      "id": "docs-1",
+      "category": "docs",
+      "question": "How do I add query parameters with validation in FastAPI?",
+      "expected_answer": "Use the Query() function with Annotated to add validation (e.g. min_length) to query parameters.",
+      "actual_answer": "You can add query parameters with validation in FastAPI by using the `Query` function and specifying the validation rules. For example, you can use `Query(min_length=3)` to specify that the query parameter `q` should have a minimum length of 3 characters. You can also use `Annotated` to add additional validation rules. \n\nHere is an example:\n```python\nfrom fastapi import FastAPI, Query\nfrom typing import Annotated\n\napp = FastAPI()\n\n@app.get(\"/items/\")\nasync def read_items(q: Annotated[str | None, Query(min_length=3)] = None):\n    results = {\"items\": [{\"item_id\": \"Foo\"}, {\"item_id\": \"Bar\"}]}\n    if q:\n        results.update({\"q\": q})\n    return results\n```\nThis will validate the query parameter `q` to have a minimum length of 3 characters. If the length is less than 3, FastAPI will return an error.\n\nYou can find more information about query parameters and validation in the FastAPI documentation: https://fastapi.tiangolo.com/tutorial/query-params-str-validations/",
+      "correctness": 5,
+      "citation_accuracy": 5,
+      "reasoning": "The agent's answer conveys the same key facts as the reference answer, including the use of the Query() function and Annotated for validation. It also cites the expected source, the FastAPI documentation, with a clear link to the relevant section.",
+      "known_limitation": false
+    },
+    {
+      "id": "docs-2",
+      "category": "docs",
+      "question": "How do I use OAuth2PasswordBearer for authentication in FastAPI?",
+      "expected_answer": "OAuth2PasswordBearer is a class provided by FastAPI's security utilities; you create an instance with a tokenUrl pointing to the token endpoint, then use it as a dependency to extract the bearer token.",
+      "actual_answer": "To use OAuth2PasswordBearer for authentication in FastAPI, you can follow these steps:\n\n1. Import the necessary modules, including `OAuth2PasswordBearer` and `OAuth2PasswordRequestForm`.\n2. Create an instance of `OAuth2PasswordBearer` and pass it to the `Depends` annotation in your route.\n3. Use `OAuth2PasswordRequestForm` to declare a form body with the `username`, `password`, and optional `scope` and `grant_type` fields.\n4. In your route, use the `OAuth2PasswordBearer` instance to authenticate the user and return a token.\n\nHere is an example of how you can use OAuth2PasswordBearer for authentication in FastAPI:\n```python\nfrom fastapi import FastAPI, Depends, HTTPException\nfrom fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm\n\napp = FastAPI()\n\noauth2_scheme = OAuth2PasswordBearer(tokenUrl=\"token\")\n\n@app.post(\"/token\")\nasync def login(form_data: OAuth2PasswordRequestForm = Depends()):\n    # Verify the username and password\n    user = authenticate_user(form_data.username, form_data.password)\n    if not user:\n        raise HTTPException(\n            status_code=400,\n            detail=\"Incorrect username or password\"\n        )\n    # Return a token\n    return {\"access_token\": user.username, \"token_type\": \"bearer\"}\n\n@app.get(\"/items/\")\nasync def read_items(token: str = Depends(oauth2_scheme)):\n    # Use the token to authenticate the user\n    user = get_current_user(token)\n    if not user:\n        raise HTTPException(\n            status_code=401,\n            detail=\"Invalid token\"\n        )\n    # Return the items\n    return [{\"name\": \"Item Foo\"}]\n```\nThis example uses `OAuth2PasswordBearer` to authenticate the user and return a token, and then uses the token to authenticate the user in the `/items/` route.\n\nYou can find more information about using OAuth2PasswordBearer in the FastAPI documentation: https://fastapi.tiangolo.com/tutorial/security/first-steps/",
+      "correctness": 5,
+      "citation_accuracy": 5,
+      "reasoning": "The answer conveys the same key facts as the reference answer, including the creation of an instance with a tokenUrl and using it as a dependency to extract the bearer token. It also cites the expected source, the FastAPI documentation, clearly.",
+      "known_limitation": false
+    },
+    {
+      "id": "issues-1",
+      "category": "issues",
+      "question": "Has anyone reported issues with lifespan startup/shutdown events not firing?",
+      "expected_answer": "Yes, there are historical GitHub issues about startup/shutdown event handling (e.g. issue #617, #811, #2943).",
+      "actual_answer": "According to the GitHub issue search, no open issues were found matching 'lifespan startup/shutdown events not firing'. However, one closed issue, [#617](https://github.com/fastapi/fastapi/issues/617), was found, which may provide some information or workarounds for the problem. It's possible that the issue has been resolved or a workaround has been provided in this closed issue. For more information, you can refer to the closed issue on GitHub.",
+      "correctness": 4,
+      "citation_accuracy": 5,
+      "reasoning": "The answer is mostly correct as it mentions a relevant GitHub issue (#617) and suggests that the issue may have been resolved or have a workaround, which aligns with the reference answer. However, it does not fully convey the same key facts as the reference answer, which mentions multiple historical GitHub issues. The citation accuracy is 5 because it clearly cites the expected source (GitHub issue #617) and provides a link to it.",
+      "known_limitation": false
+    },
+    {
+      "id": "multi-1",
+      "category": "multi-part",
+      "question": "What changed in FastAPI 0.139.0, and has anyone reported issues with the app.frontend() feature added in it?",
+      "expected_answer": "0.139.0 added app.frontend() dependency support (PR #15908); no GitHub issues currently reference app.frontend() specifically.",
+      "actual_answer": "FastAPI version 0.139.0 introduced the following changes:\n\n### Features\n*   **Frontend Dependencies:** The release added support for dependencies in `app.frontend()`, enabling functionality such as automatic cookie authentication for the frontend (PR [#15908](https://github.com/fastapi/fastapi/pull/15908)).\n\n### Other Updates\n*   **Translations:** Extensive updates were made to documentation translations across multiple languages (French, Japanese, Traditional Chinese, German, Spanish, Turkish, Portuguese, Simplified Chinese, Ukrainian, Korean, and Russian).\n*   **Internal:** Updates were made to the FastAPI People list, GitHub topic repositories, and various internal maintenance tasks, including dependency bumps and CI configuration cleanup.\n\n### Regarding Issues with `app.frontend()`\nNo GitHub issues were found specifically reporting problems with the `app.frontend()` feature in version 0.139.0. \n\nIt is important to note that `app.frontend()` is not a standard feature of the core FastAPI framework. If you are encountering errors related to this method, it is recommended that you verify your codebase to ensure you are not using a third-party extension, a custom implementation, or a misnamed method.",
+      "correctness": 5,
+      "citation_accuracy": 5,
+      "reasoning": "The agent correctly identified the feature added in 0.139.0, cited the correct PR, and accurately stated that no specific issues have been reported regarding it.",
+      "known_limitation": true
+    }
+  ]
+}
