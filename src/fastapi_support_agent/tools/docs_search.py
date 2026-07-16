@@ -8,6 +8,7 @@ tools. Keeps one consistent loop instead of nesting an LLM call inside a tool.
 
 from langchain_core.tools import tool
 
+from fastapi_support_agent.rag.chunking import DOCS_ROOT
 from fastapi_support_agent.rag.retrieval import build_reranked_retriever
 
 
@@ -19,6 +20,15 @@ def search_fastapi_docs(query: str) -> str:
     Not for changelog/version/deprecation questions (use the changelog tools)
     or bug reports (use GitHub issue search).
     """
+    # On a fresh container start, fetch_docs.py/build_index.py run in the
+    # background while uvicorn is already serving (see docker/Dockerfile) -
+    # this is the small window before that job finishes.
+    if not DOCS_ROOT.exists():
+        return (
+            "The documentation index is still being built after a cold start "
+            "- this takes a minute or two. Please retry shortly."
+        )
+
     retriever = build_reranked_retriever(top_n=4)
     chunks = retriever.invoke(query)
     if not chunks:

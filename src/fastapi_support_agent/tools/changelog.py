@@ -100,12 +100,20 @@ def _search(term: str, entries: list[ChangelogEntry]) -> list[ChangelogEntry]:
     return sorted(matches, key=lambda e: e.date or "9999-99-99", reverse=True)
 
 
+_COLD_START_MESSAGE = (
+    "The documentation/changelog index is still being built after a cold "
+    "start - this takes a minute or two. Please retry shortly."
+)
+
+
 @tool
 def lookup_changelog_version(version: str) -> str:
     """Look up what changed in a specific FastAPI version, e.g. "0.139.0".
 
     Returns every changelog entry recorded for that exact version number.
     """
+    if not CHANGELOG_PATH.exists():
+        return _COLD_START_MESSAGE
     entries = [e for e in parse_changelog() if e.version == version]
     if not entries:
         return f"No changelog entries found for version {version}."
@@ -123,6 +131,8 @@ def check_deprecated(term: str) -> str:
     "regex parameter") and reports any entries that mention deprecation or removal,
     alongside other mentions for context.
     """
+    if not CHANGELOG_PATH.exists():
+        return _COLD_START_MESSAGE
     matches = _search(term, parse_changelog())
     if not matches:
         return f"No changelog mentions found for '{term}'. It may never have changed, or the term doesn't match changelog wording."

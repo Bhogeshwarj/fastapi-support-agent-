@@ -27,4 +27,11 @@ COPY scripts/ scripts/
 ENV PORT=8000
 EXPOSE 8000
 
-CMD ["sh", "-c", "uv run scripts/fetch_docs.py && uv run scripts/build_index.py && uv run uvicorn fastapi_support_agent.api.main:app --app-dir src --host 0.0.0.0 --port ${PORT}"]
+# uvicorn must start in the foreground immediately so Render's port scan
+# succeeds (confirmed via a real deploy: running fetch/build before uvicorn
+# blew past Render's port-scan timeout, since git clone + embedding load
+# takes longer than that window). Fetch+build now run in the background
+# instead; search_fastapi_docs (tools/docs_search.py) checks whether the
+# corpus/index exist yet and returns a friendly "still initializing" message
+# for the small window between container start and that job finishing.
+CMD ["sh", "-c", "(uv run scripts/fetch_docs.py && uv run scripts/build_index.py) & uv run uvicorn fastapi_support_agent.api.main:app --app-dir src --host 0.0.0.0 --port ${PORT}"]
