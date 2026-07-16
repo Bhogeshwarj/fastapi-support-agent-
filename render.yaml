@@ -3,10 +3,12 @@
 # configuring build settings and env vars one at a time.
 #
 # plan: free has no persistent disk and resets state on each deploy - this is
-# fine here on purpose, since the Dockerfile already bakes the doc corpus and
-# vector index into the image at build time (see docker/Dockerfile), so the
-# container is fully self-contained and doesn't depend on any disk surviving
-# a restart or redeploy.
+# fine here on purpose: the Dockerfile fetches the doc corpus and rebuilds the
+# vector index at container startup (not image build time - Render's Docker
+# build step can't reach huggingface.co, confirmed via a real failed deploy),
+# so nothing depends on a disk surviving a restart or redeploy. Trade-off:
+# every cold start takes longer (docs fetch + index build before uvicorn
+# even starts) - acceptable on the free tier's spin-down/spin-up cycle.
 services:
   - type: web
     name: fastapi-support-agent
