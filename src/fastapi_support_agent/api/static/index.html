@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FastAPI Support Agent</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <div class="header-title">
+        <span class="dot"></span>
+        <h1>FastAPI Support Agent</h1>
+      </div>
+      <p class="subtitle">Docs, changelog, deprecations &amp; GitHub issues - answered with citations.</p>
+    </header>
+
+    <main id="chat" class="chat"></main>
+
+    <form id="chat-form" class="composer">
+      <input
+        id="chat-input"
+        type="text"
+        placeholder="Ask about FastAPI - e.g. 'Is ORJSONResponse deprecated?'"
+        autocomplete="off"
+      />
+      <button type="submit" id="send-btn">Send</button>
+    </form>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

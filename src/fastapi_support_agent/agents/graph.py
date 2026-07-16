@@ -27,6 +27,7 @@ from pydantic import BaseModel, Field
 from typing_extensions import TypedDict
 
 from fastapi_support_agent.gateway.client import get_gateway_llm
+from fastapi_support_agent.gateway.content import extract_text
 from fastapi_support_agent.tools.changelog import check_deprecated, lookup_changelog_version
 from fastapi_support_agent.tools.docs_search import search_fastapi_docs
 from fastapi_support_agent.tools.github_issues import search_github_issues
@@ -227,7 +228,12 @@ def build_agent_graph():
 
     def hitl_check(state: AgentState) -> dict:
         last_message = state["messages"][-1]
-        content = str(last_message.content)
+        # Must normalize with extract_text() before this becomes a string -
+        # Gemini's list-of-blocks content shape, once naively str()'d, can't
+        # be recovered later (confirmed via browser test: the draft_answer
+        # shown to a human reviewer was a raw Python list repr instead of
+        # readable text).
+        content = extract_text(last_message.content)
         if not any(kw in content.lower() for kw in RISKY_KEYWORDS):
             return {}
 
