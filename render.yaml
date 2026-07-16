@@ -1,0 +1,37 @@
+# Render Blueprint - lets you deploy this whole service with one click
+# (Dashboard -> New -> Blueprint -> connect this repo) instead of manually
+# configuring build settings and env vars one at a time.
+#
+# plan: free has no persistent disk and resets state on each deploy - this is
+# fine here on purpose, since the Dockerfile already bakes the doc corpus and
+# vector index into the image at build time (see docker/Dockerfile), so the
+# container is fully self-contained and doesn't depend on any disk surviving
+# a restart or redeploy.
+services:
+  - type: web
+    name: fastapi-support-agent
+    runtime: docker
+    dockerfilePath: ./docker/Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      # Secrets - Render prompts for these during Blueprint creation, never
+      # committed to the repo. Get them from console.groq.com,
+      # aistudio.google.com/apikey, smith.langchain.com, and a fine-grained
+      # GitHub PAT scoped to public-repo read-only (see .env.example).
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: LANGSMITH_API_KEY
+        sync: false
+      # Not secrets - safe defaults, editable in the Render dashboard after creation.
+      - key: LANGSMITH_TRACING
+        value: "true"
+      - key: LANGSMITH_PROJECT
+        value: fastapi-support-agent
+      - key: KILL_SWITCH_ENABLED
+        value: "false"
