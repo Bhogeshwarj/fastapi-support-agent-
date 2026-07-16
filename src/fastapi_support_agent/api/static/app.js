@@ -2,8 +2,31 @@ const chatEl = document.getElementById("chat");
 const formEl = document.getElementById("chat-form");
 const inputEl = document.getElementById("chat-input");
 const sendBtn = document.getElementById("send-btn");
+const emptyStateEl = document.getElementById("empty-state");
+const themeToggleEl = document.getElementById("theme-toggle");
 
 let threadId = null;
+
+// --- Theme ---------------------------------------------------------------
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  localStorage.setItem("theme", theme);
+}
+
+(function initTheme() {
+  const saved = localStorage.getItem("theme");
+  if (saved) applyTheme(saved);
+})();
+
+themeToggleEl.addEventListener("click", () => {
+  const current =
+    document.documentElement.getAttribute("data-theme") ||
+    (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+  applyTheme(current === "dark" ? "light" : "dark");
+});
+
+// --- Markdown --------------------------------------------------------------
 
 // Minimal markdown -> HTML: fenced code blocks, links, bold, inline code,
 // headers, bullets. Deliberately not pulling in a markdown library for one
@@ -25,28 +48,68 @@ function renderMarkdown(text) {
     .replace(/\n/g, "<br>");
 }
 
-function addBubble(text, cls) {
-  const div = document.createElement("div");
-  div.className = `bubble ${cls}`;
-  div.innerHTML = renderMarkdown(text);
-  chatEl.appendChild(div);
+// --- Chat rendering ----------------------------------------------------------
+
+function hideEmptyState() {
+  if (emptyStateEl) emptyStateEl.remove();
+}
+
+function scrollToBottom() {
   chatEl.scrollTop = chatEl.scrollHeight;
-  return div;
+}
+
+function addBubble(text, role) {
+  hideEmptyState();
+  const row = document.createElement("div");
+  row.className = `row ${role}`;
+
+  const avatar = document.createElement("div");
+  avatar.className = `avatar ${role}`;
+  avatar.textContent = role === "user" ? "You" : "FA";
+
+  const bubble = document.createElement("div");
+  bubble.className = `bubble ${role}`;
+  bubble.innerHTML = renderMarkdown(text);
+
+  row.appendChild(avatar);
+  row.appendChild(bubble);
+  chatEl.appendChild(row);
+  scrollToBottom();
+  return bubble;
 }
 
 function addTyping() {
-  const div = document.createElement("div");
-  div.className = "typing";
-  div.textContent = "Thinking...";
-  chatEl.appendChild(div);
-  chatEl.scrollTop = chatEl.scrollHeight;
-  return div;
+  hideEmptyState();
+  const row = document.createElement("div");
+  row.className = "typing-row";
+
+  const avatar = document.createElement("div");
+  avatar.className = "avatar agent";
+  avatar.textContent = "FA";
+
+  const typing = document.createElement("div");
+  typing.className = "typing";
+  typing.innerHTML = "<span></span><span></span><span></span>";
+
+  row.appendChild(avatar);
+  row.appendChild(typing);
+  chatEl.appendChild(row);
+  scrollToBottom();
+  return row;
 }
 
 function addPendingApproval(draftAnswer, onDecision) {
-  const div = document.createElement("div");
-  div.className = "bubble pending";
-  div.innerHTML = `
+  hideEmptyState();
+  const row = document.createElement("div");
+  row.className = "row agent";
+
+  const avatar = document.createElement("div");
+  avatar.className = "avatar agent";
+  avatar.textContent = "FA";
+
+  const bubble = document.createElement("div");
+  bubble.className = "bubble pending";
+  bubble.innerHTML = `
     <div class="pending-label">&#9888; Needs human approval</div>
     <div class="draft">${renderMarkdown(draftAnswer)}</div>
     <div class="pending-actions">
@@ -54,18 +117,23 @@ function addPendingApproval(draftAnswer, onDecision) {
       <button class="reject">Reject &amp; flag for review</button>
     </div>
   `;
-  chatEl.appendChild(div);
-  chatEl.scrollTop = chatEl.scrollHeight;
 
-  div.querySelector(".approve").addEventListener("click", () => {
-    div.remove();
+  row.appendChild(avatar);
+  row.appendChild(bubble);
+  chatEl.appendChild(row);
+  scrollToBottom();
+
+  bubble.querySelector(".approve").addEventListener("click", () => {
+    row.remove();
     onDecision("approve");
   });
-  div.querySelector(".reject").addEventListener("click", () => {
-    div.remove();
+  bubble.querySelector(".reject").addEventListener("click", () => {
+    row.remove();
     onDecision("REVIEW NEEDED: this claim was rejected by a human reviewer and should be independently verified.");
   });
 }
+
+// --- API ---------------------------------------------------------------
 
 async function sendToApi(path, body) {
   const res = await fetch(path, {
@@ -99,13 +167,8 @@ function handleResult(result) {
   }
 }
 
-formEl.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const message = inputEl.value.trim();
-  if (!message) return;
-
+async function submitMessage(message) {
   addBubble(message, "user");
-  inputEl.value = "";
   sendBtn.disabled = true;
   const typing = addTyping();
 
@@ -120,4 +183,16 @@ formEl.addEventListener("submit", async (e) => {
     sendBtn.disabled = false;
     inputEl.focus();
   }
+}
+
+formEl.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const message = inputEl.value.trim();
+  if (!message) return;
+  inputEl.value = "";
+  submitMessage(message);
+});
+
+document.querySelectorAll(".chip").forEach((chip) => {
+  chip.addEventListener("click", () => submitMessage(chip.textContent.trim()));
 });

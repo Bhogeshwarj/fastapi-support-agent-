@@ -2,30 +2,56 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0d12" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#f7f8fa" media="(prefers-color-scheme: light)" />
   <title>FastAPI Support Agent</title>
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
   <div class="app">
     <header class="app-header">
-      <div class="header-title">
-        <span class="dot"></span>
-        <h1>FastAPI Support Agent</h1>
+      <div class="header-row">
+        <div class="header-title">
+          <div class="logo-mark">
+            <span class="dot"></span>
+            FA
+          </div>
+          <div class="header-text">
+            <h1>FastAPI Support Agent</h1>
+            <p class="subtitle">Docs, changelog, deprecations &amp; GitHub issues — with citations.</p>
+          </div>
+        </div>
+        <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Toggle light/dark theme">
+          <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+          <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"/></svg>
+        </button>
       </div>
-      <p class="subtitle">Docs, changelog, deprecations &amp; GitHub issues - answered with citations.</p>
     </header>
 
-    <main id="chat" class="chat"></main>
+    <main id="chat" class="chat">
+      <div id="empty-state" class="empty-state">
+        <div class="empty-badge">FA</div>
+        <h2>Ask me anything about FastAPI</h2>
+        <p>I search the real docs, changelog, and GitHub issues — and cite my sources.</p>
+        <div class="suggestions">
+          <button class="chip" type="button">Is ORJSONResponse deprecated?</button>
+          <button class="chip" type="button">How do I use dependency injection?</button>
+          <button class="chip" type="button">What changed in the last release?</button>
+        </div>
+      </div>
+    </main>
 
     <form id="chat-form" class="composer">
       <input
         id="chat-input"
         type="text"
-        placeholder="Ask about FastAPI - e.g. 'Is ORJSONResponse deprecated?'"
+        placeholder="Ask about FastAPI…"
         autocomplete="off"
       />
-      <button type="submit" id="send-btn">Send</button>
+      <button type="submit" id="send-btn" aria-label="Send message">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7Z"/></svg>
+      </button>
     </form>
   </div>
 

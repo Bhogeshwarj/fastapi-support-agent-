@@ -1,110 +1,356 @@
 :root {
   --bg: #0b0d12;
-  --panel: #12151c;
-  --border: #22262f;
-  --text: #e6e8eb;
+  --bg-gradient: radial-gradient(1200px 600px at 50% -10%, #1a2140 0%, #0b0d12 55%);
+  --panel: #141821;
+  --panel-solid: #12151c;
+  --border: #23283380;
+  --border-solid: #262b35;
+  --text: #e9ebef;
   --muted: #8b93a1;
-  --accent: #4f8cff;
-  --accent-dim: #1f3a66;
-  --user-bubble: #1c2536;
-  --agent-bubble: #161a22;
-  --warn: #d9a441;
-  --danger: #e2574c;
-  --ok: #3fc880;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+  --accent: #7c9bff;
+  --accent-2: #a684ff;
+  --accent-dim: #1f2a4d;
+  --user-bubble: linear-gradient(135deg, #2a3358, #1c2340);
+  --agent-bubble: #171b24;
+  --warn: #e3ad55;
+  --danger: #ff6b6b;
+  --ok: #3fd68c;
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  --radius-lg: 20px;
+  --radius-md: 14px;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --bg: #f5f6fa;
+  --bg-gradient: radial-gradient(1200px 600px at 50% -10%, #e7ecff 0%, #f5f6fa 55%);
+  --panel: #ffffff;
+  --panel-solid: #ffffff;
+  --border: #e3e6ee;
+  --border-solid: #e3e6ee;
+  --text: #1b1e27;
+  --muted: #6b7280;
+  --accent: #4f6bff;
+  --accent-2: #8b5cf6;
+  --accent-dim: #eef1ff;
+  --user-bubble: linear-gradient(135deg, #4f6bff, #6d5bff);
+  --agent-bubble: #ffffff;
+  --warn: #b8770f;
+  --danger: #e0473e;
+  --ok: #18a768;
+  --shadow: 0 8px 30px rgba(30, 40, 80, 0.08);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f5f6fa;
+    --bg-gradient: radial-gradient(1200px 600px at 50% -10%, #e7ecff 0%, #f5f6fa 55%);
+    --panel: #ffffff;
+    --panel-solid: #ffffff;
+    --border: #e3e6ee;
+    --border-solid: #e3e6ee;
+    --text: #1b1e27;
+    --muted: #6b7280;
+    --accent: #4f6bff;
+    --accent-2: #8b5cf6;
+    --accent-dim: #eef1ff;
+    --user-bubble: linear-gradient(135deg, #4f6bff, #6d5bff);
+    --agent-bubble: #ffffff;
+    --warn: #b8770f;
+    --danger: #e0473e;
+    --ok: #18a768;
+    --shadow: 0 8px 30px rgba(30, 40, 80, 0.08);
+    color-scheme: light;
+  }
 }
 
 * {
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
   margin: 0;
-  background: var(--bg);
+  background: var(--bg-gradient), var(--bg);
   color: var(--text);
-  height: 100vh;
+  height: 100dvh;
   display: flex;
   justify-content: center;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 .app {
   width: 100%;
-  max-width: 760px;
-  height: 100vh;
+  max-width: 780px;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   padding: 0 16px;
 }
 
 .app-header {
-  padding: 20px 4px 14px;
+  padding: max(16px, env(safe-area-inset-top)) 4px 16px;
   border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(10px);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: color-mix(in srgb, var(--bg) 75%, transparent);
+}
+
+.header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .header-title {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  min-width: 0;
 }
 
-.header-title h1 {
-  font-size: 18px;
-  margin: 0;
-  font-weight: 600;
+.logo-mark {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  color: white;
+  letter-spacing: 0.02em;
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
 .dot {
-  width: 9px;
-  height: 9px;
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background: var(--ok);
-  box-shadow: 0 0 8px var(--ok);
+  box-shadow: 0 0 0 2px var(--panel), 0 0 8px var(--ok);
+}
+
+.header-text {
+  min-width: 0;
+}
+
+.header-title h1 {
+  font-size: 16px;
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .subtitle {
-  margin: 6px 0 0;
-  font-size: 13px;
+  margin: 2px 0 0;
+  font-size: 12.5px;
   color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.theme-toggle {
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  border-radius: 10px;
+  border: 1px solid var(--border-solid);
+  background: var(--panel);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.15s ease;
+}
+
+.theme-toggle:hover {
+  border-color: var(--accent);
+}
+
+.theme-toggle:active {
+  transform: scale(0.92);
+}
+
+.theme-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+
+.theme-toggle .icon-moon {
+  display: none;
+}
+
+:root[data-theme="light"] .theme-toggle .icon-sun,
+:root:not([data-theme="dark"]) .theme-toggle .icon-sun {
+  display: none;
+}
+
+:root[data-theme="light"] .theme-toggle .icon-moon,
+:root:not([data-theme="dark"]) .theme-toggle .icon-moon {
+  display: block;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .theme-toggle .icon-sun {
+    display: block;
+  }
+  :root:not([data-theme="light"]) .theme-toggle .icon-moon {
+    display: none;
+  }
 }
 
 .chat {
   flex: 1;
   overflow-y: auto;
-  padding: 20px 4px;
+  padding: 24px 4px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
+  scroll-behavior: smooth;
+}
+
+.empty-state {
+  margin: auto 0;
+  text-align: center;
+  padding: 24px 8px;
+  animation: fadeIn 0.4s ease both;
+}
+
+.empty-badge {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 18px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 18px;
+  color: white;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.empty-state h2 {
+  font-size: 19px;
+  margin: 0 0 8px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.empty-state p {
+  margin: 0 0 20px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.chip {
+  font-size: 13px;
+  padding: 9px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border-solid);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.15s ease, background 0.2s ease;
+}
+
+.chip:hover {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.chip:active {
+  transform: scale(0.96);
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  animation: fadeIn 0.28s ease both;
+}
+
+.row.user {
+  flex-direction: row-reverse;
+}
+
+.avatar {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+  margin-bottom: 2px;
+}
+
+.avatar.agent {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+}
+
+.avatar.user {
+  background: #545d73;
 }
 
 .bubble {
-  max-width: 82%;
-  padding: 12px 15px;
-  border-radius: 14px;
-  line-height: 1.5;
+  max-width: 78%;
+  padding: 13px 16px;
+  border-radius: var(--radius-md);
+  line-height: 1.55;
   font-size: 14.5px;
   white-space: pre-wrap;
+  box-shadow: var(--shadow);
 }
 
 .bubble.user {
-  align-self: flex-end;
   background: var(--user-bubble);
-  border: 1px solid var(--accent-dim);
+  color: white;
   border-bottom-right-radius: 4px;
 }
 
 .bubble code {
-  background: #1e232c;
+  background: color-mix(in srgb, var(--text) 8%, transparent);
   padding: 1px 5px;
   border-radius: 4px;
   font-family: "SF Mono", Menlo, Consolas, monospace;
   font-size: 13px;
 }
 
+.bubble.user code {
+  background: rgba(255, 255, 255, 0.15);
+}
+
 .bubble pre {
-  background: #0e1116;
+  background: color-mix(in srgb, var(--bg) 60%, black 10%);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 12px;
+  border-radius: 10px;
+  padding: 11px 13px;
   overflow-x: auto;
   margin: 8px 0;
 }
@@ -115,49 +361,52 @@ body {
 }
 
 .bubble.agent {
-  align-self: flex-start;
   background: var(--agent-bubble);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-solid);
   border-bottom-left-radius: 4px;
 }
 
 .bubble.agent a {
   color: var(--accent);
+  font-weight: 500;
 }
 
 .bubble.pending {
-  align-self: flex-start;
-  background: #1c1912;
-  border: 1px solid var(--warn);
+  background: color-mix(in srgb, var(--warn) 10%, var(--agent-bubble));
+  border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent);
   border-bottom-left-radius: 4px;
+  max-width: 82%;
 }
 
 .pending-label {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 11.5px;
+  font-weight: 700;
   color: var(--warn);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-bottom: 8px;
+  letter-spacing: 0.05em;
+  margin-bottom: 10px;
 }
 
 .pending-actions {
   display: flex;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 14px;
 }
 
 .pending-actions button {
   font-size: 13px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: transparent;
+  font-weight: 600;
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border-solid);
+  background: var(--panel);
   color: var(--text);
   cursor: pointer;
+  transition: filter 0.15s ease, transform 0.1s ease;
+  min-height: 38px;
 }
 
 .pending-actions .approve {
@@ -171,50 +420,146 @@ body {
 }
 
 .pending-actions button:hover {
-  filter: brightness(1.2);
+  filter: brightness(1.15);
+}
+
+.pending-actions button:active {
+  transform: scale(0.96);
+}
+
+.typing-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  animation: fadeIn 0.2s ease both;
 }
 
 .typing {
-  align-self: flex-start;
-  color: var(--muted);
-  font-size: 13px;
-  padding: 4px 4px;
+  display: flex;
+  gap: 4px;
+  padding: 14px 16px;
+  background: var(--agent-bubble);
+  border: 1px solid var(--border-solid);
+  border-radius: var(--radius-md);
+  border-bottom-left-radius: 4px;
+}
+
+.typing span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+  animation: bounce 1.2s infinite ease-in-out;
+}
+
+.typing span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.typing span:nth-child(3) {
+  animation-delay: 0.3s;
 }
 
 .composer {
   display: flex;
   gap: 10px;
-  padding: 14px 4px 20px;
+  padding: 14px 4px max(14px, env(safe-area-inset-bottom));
   border-top: 1px solid var(--border);
 }
 
 .composer input {
   flex: 1;
   background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px 14px;
+  border: 1px solid var(--border-solid);
+  border-radius: 999px;
+  padding: 13px 18px;
   color: var(--text);
-  font-size: 14px;
+  font-size: 15px;
   outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.composer input::placeholder {
+  color: var(--muted);
 }
 
 .composer input:focus {
   border-color: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 .composer button {
-  background: var(--accent);
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
   color: white;
   border: none;
-  border-radius: 10px;
-  padding: 0 18px;
-  font-size: 14px;
-  font-weight: 600;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
+  transition: transform 0.15s ease, filter 0.15s ease;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.composer button svg {
+  width: 19px;
+  height: 19px;
+}
+
+.composer button:hover {
+  filter: brightness(1.08);
+}
+
+.composer button:active {
+  transform: scale(0.92);
 }
 
 .composer button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 480px) {
+  .app {
+    padding: 0 10px;
+  }
+
+  .subtitle {
+    max-width: 46vw;
+  }
+
+  .bubble,
+  .bubble.pending {
+    max-width: 88%;
+  }
+
+  .empty-state h2 {
+    font-size: 17px;
+  }
 }
