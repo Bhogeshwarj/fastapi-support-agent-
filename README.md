@@ -14,8 +14,8 @@ short problem/approach/trade-offs/results summary.
 
 ## What it can do
 
-- **Doc Q&A with real citations** — hybrid (vector + keyword) search, cross-encoder
-  reranked, over FastAPI's actual documentation. Answers link back to real pages on
+- **Doc Q&A with real citations** — hybrid (vector + keyword) search over FastAPI's actual
+  documentation, merged by Reciprocal Rank Fusion. Answers link back to real pages on
   `fastapi.tiangolo.com`.
 - **"Is X deprecated?" / version lookup** — parses FastAPI's real changelog history
   (3,000+ entries) rather than guessing from an LLM's training data.
@@ -44,9 +44,8 @@ Full diagram and the reasoning behind every node: [`ARCHITECTURE.md`](./ARCHITEC
 ## Tech stack
 
 Python 3.13, `uv`, LangChain / LangGraph 1.x, Groq + Google Gemini (via `langchain-groq` /
-`langchain-google-genai`), Chroma + local `sentence-transformers` embeddings, BM25 hybrid
-search, a local cross-encoder reranker, FastAPI + vanilla HTML/CSS/JS frontend, Docker,
-Render.
+`langchain-google-genai`), Chroma + Gemini API embeddings, BM25 hybrid search, FastAPI +
+vanilla HTML/CSS/JS frontend, Docker, Render.
 
 ## Eval results
 
@@ -61,6 +60,9 @@ reference answers (`scripts/run_eval.py`, results tracked in `eval_runs/` across
 Two of the eight are **deliberate known-failure cases**, included on purpose so these
 numbers reflect real capability instead of only counting easy wins — see
 `src/fastapi_support_agent/eval/golden_set.json` and the "Known limitations" section below.
+(Measured against the cross-encoder-reranked retrieval pipeline; not yet re-run since
+switching to Gemini API embeddings and dropping the reranker for memory reasons — see
+"Known limitations.")
 
 ## Running it
 
@@ -80,8 +82,10 @@ docker build -f docker/Dockerfile -t fastapi-support-agent .
 docker run -p 8000:8000 --env-file .env fastapi-support-agent
 ```
 The doc corpus and vector index are fetched/built at container **startup** (not image build
-time — Render's Docker build step can't reach `huggingface.co`, found via a real deploy
-attempt), running in the background while the API starts serving immediately.
+time — Render's free tier isn't guaranteed a persistent disk), running in the background
+while the API starts serving immediately so Render's port-scan doesn't time out. See
+"Known limitations" below and `LEARNING_JOURNEY.md`'s deployment section for the memory and
+rate-limit constraints this surfaced on Render's free tier.
 
 **Render:** connect this repo in the Render dashboard — it auto-detects `render.yaml` and
 prompts for the four required secrets. Free tier spins down after 15 min idle (~1 min
@@ -103,3 +107,15 @@ Tracked honestly rather than hidden — full detail in `ARCHITECTURE.md` and
   limiting, just not logged cost).
 - No automated `pytest` suite — verification has been the eval harness plus deliberate
   manual/browser-driven testing at every step.
+- **Local embeddings/reranking replaced with Gemini's embeddings API** after a real Render
+  free-tier (512MB) OOM: measured that a single process just *importing* the RAG module
+  chain (torch + transformers + sentence-transformers + chromadb) already sat at ~98% of
+  the limit before serving a request — no restructuring of that dependency stack fit in
+  512MB. Trades unlimited local embedding for Gemini's free-tier caps (100 requests/minute,
+  1000/day) and the reranking step for a plain RRF-merge trim.
+- Any tool call that reaches an external API (doc search's embedding call, GitHub issue
+  search) must catch its own exceptions - `/chat` has no top-level try/except, so an
+  uncaught error anywhere in the tool-calling loop surfaces as a bare 500 instead of a
+  graceful in-chat message. Found live: a question needing `search_fastapi_docs` 500'd
+  after the embedding quota above was exhausted, while a question the LLM could answer
+  without a tool call worked fine.

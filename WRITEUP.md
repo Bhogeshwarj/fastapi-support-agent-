@@ -22,9 +22,10 @@ before anything ships. Every LLM call in every one of those nodes goes through a
 gateway that picks between two free-tier providers (Groq primary, Gemini fallback), retries
 on failure, self-throttles to stay under rate limits, and logs cost.
 
-The RAG layer itself is hybrid search (vector + BM25) merged by reciprocal rank fusion,
-then reranked by a cross-encoder before synthesis — chosen after empirically comparing
-results, not by default. The changelog/deprecation tooling deliberately isn't RAG at all:
+The RAG layer itself is hybrid search (vector + BM25) merged by reciprocal rank fusion.
+(Originally reranked by a local cross-encoder after the merge, chosen after empirically
+comparing results — dropped later for the memory reasons in Results/Trade-offs below.) The
+changelog/deprecation tooling deliberately isn't RAG at all:
 it's a regex parser over the real changelog, because "is X deprecated" needs an exhaustive,
 exact answer, not a top-k similarity guess. Quality is measured by an eval harness — a
 golden set of real questions with pre-verified reference answers, scored by an LLM-as-judge,
@@ -39,6 +40,17 @@ with results tracked across git commits so regressions are visible over time.
   free tier isn't guaranteed a persistent disk, so the docs/index are rebuilt at container
   startup instead, trading a slower cold start for a fully stateless, self-contained
   container.
+- **Local embeddings/reranking vs. an API-based embedding provider** — chose local
+  (`sentence-transformers`) first specifically to avoid burning through an API's free-tier
+  request quota. Reversed after actually deploying: a 512MB Render container running that
+  local stack (torch + transformers + sentence-transformers + chromadb) sat at ~98% memory
+  just from *importing* it, before serving a single request — confirmed by capping a local
+  Docker container at 512MB and reproducing the OOM directly, then re-testing after the
+  fix. Switched to Gemini's embeddings API instead, trading unlimited local embedding for a
+  documented 100/minute and 1000/day quota, and dropped the cross-encoder reranker for the
+  same reason. The right call given the constraint, but it does mean eval numbers below
+  predate this change and doc search is *fully* unavailable (not just degraded) once the
+  daily quota is hit, rather than merely slower.
 - **Prompt-based grounding over a heavier architectural fix** — a sub-agent's tendency to
   override tool output with its own pretrained assumptions (see Results) was reduced with
   a system-prompt instruction rather than a more complex programmatic contradiction-detector.
@@ -58,10 +70,14 @@ with results tracked across git commits so regressions are visible over time.
   got the agent to relay dangerous security advice as legitimate, until a grounding
   instruction closed it — verified across repeated runs) and a UI bug where Gemini's
   structured response format leaked as a raw Python repr into the human-approval screen.
-- **A real deployment failure found and fixed independently**: Render's Docker build step
-  can't reach `huggingface.co`, breaking the embedding model download at build time — fixed
-  by moving that step to container startup, running in the background while the API starts
-  serving immediately.
+- **A real deployment debugging loop, not a single fix**: Render's Docker build step
+  couldn't reach `huggingface.co` (fixed by moving doc-fetch/index-build to container
+  startup) → that then blew Render's port-scan timeout (fixed by backgrounding it behind
+  uvicorn) → that then deadlocked on `uv`'s own environment lock (fixed with `--no-sync`)
+  → that finally surfaced a 512MB OOM, root-caused by measuring actual memory in a
+  locally-capped-at-512MB container rather than guessing, which led to the embeddings-API
+  switch above. Each fix was verified against the real failure mode before moving to the
+  next, not assumed to work.
 - **One documented, unresolved limitation, tracked rather than hidden**: a sub-agent
   sometimes overrides correct tool output with its own outdated training belief when a
   search legitimately returns nothing — reduced, not eliminated, and said so plainly in the

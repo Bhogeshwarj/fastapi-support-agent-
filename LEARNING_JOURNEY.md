@@ -82,6 +82,8 @@ chunk sizes or loses section context.
 **Concept: local embeddings.** `sentence-transformers/all-MiniLM-L6-v2`, run entirely
 on-machine — chosen specifically because embedding ~1,600 chunks via an API would burn
 through free-tier request quota fast; local embedding is unlimited and genuinely free.
+*(Reversed in M11 below - this reasoning was right about the quota risk, but wrong about
+it being the binding constraint: memory was, and it hit first.)*
 
 **Concept: hybrid search + Reciprocal Rank Fusion.** Vector search (semantic similarity)
 and BM25 (keyword matching, good at exact class names) are two different retrieval
@@ -91,7 +93,8 @@ in each list — not a fresh comparison, a merge of rankings.
 **Concept: cross-encoder reranking.** Unlike vector/BM25 (which score query and document
 *independently*), a cross-encoder scores the query and one candidate *together* in a single
 pass — far more accurate, but too expensive to run on the whole corpus, so it only reranks
-the small hybrid-merged shortlist.
+the small hybrid-merged shortlist. *(Dropped in M11 below, same memory constraint that
+killed local embeddings - a cross-encoder is itself a local torch model.)*
 
 **Real finding:** the raw hybrid merge returned 10 results for `k=5` (not trimmed), and some
 were weak keyword-only matches. Reranking + trimming to `top_n` fixed this, verified by
@@ -204,7 +207,80 @@ before the graph is touched at all — the cheapest possible circuit breaker.
 by moving the doc-fetch + index-build step from build time to container *startup* instead,
 running in the background while `uvicorn` starts serving immediately, with both
 `search_fastapi_docs` and the changelog tools returning a graceful "still warming up, retry
-shortly" message during that window rather than erroring.
+shortly" message during that window rather than erroring. This was the first of four
+distinct failures in getting Render fully working - continued in M11.
+
+### M11 — Render deployment debugging: four failures, four root causes
+
+Each fix in this sequence was verified against the *actual* failure before moving to the
+next, not assumed to work from reasoning alone - a pattern worth calling out on its own,
+separate from the technical fixes themselves.
+
+**Failure 2: port-scan timeout.** Moving doc-fetch/index-build to container startup (M9,
+above) meant `uvicorn` didn't bind the port until that job finished, and cloning the repo
+plus downloading/loading an embedding model took longer than Render's port-scan window.
+**Fix:** background the fetch/build job, start `uvicorn` in the foreground immediately.
+
+**Failure 3: the identical timeout, again, after backgrounding.** `uv run` takes an
+internal lock to check/sync its venv before running anything - two concurrent `uv run`
+invocations (the backgrounded job and `uvicorn`) serialize on that same lock, so `uvicorn`
+silently blocked until the background job finished, reproducing the exact same symptom.
+**Concept: `uv run --no-sync`.** Skips the sync check entirely - safe here because the venv
+was already synced with `--frozen` at image build time, so no runtime re-sync is needed.
+**Fix, verified locally before redeploying:** ran the exact container startup shell logic
+locally, confirmed the port opened in ~14s (previously never) while the background job
+completed with no errors, running concurrently with a responsive server.
+
+**Failure 4: OOM ("Ran out of memory (used over 512MB)").** This is the one worth
+remembering the methodology for as much as the fix. Rather than guessing again, I ran the
+built Docker image in a *local* container with a hard `-m 512m --memory-swap 512m` cap -
+reproducing Render's exact limit on a machine I could actually inspect. That surfaced two
+separate, compounding problems:
+1. **`torch` defaults to the CUDA-enabled Linux wheel.** Even though this app only ever
+   does CPU inference on a small embedding model, `torch` (pulled in transitively via
+   `sentence-transformers`) resolved to a build depending on the full nvidia
+   cublas/cudnn/cufft/cusolver/cusparse/nvjitlink stack - multiple GB of GPU libraries that
+   get mapped into memory at `import torch` regardless of whether a GPU exists. **Concept:
+   pinning a transitive dependency's source in `uv`.** `[tool.uv.sources]` only overrides
+   packages that are *direct* project dependencies - `torch` had to be added directly to
+   `pyproject.toml` before a marker-scoped `{ index = "pytorch-cpu", marker = "sys_platform
+   == 'linux'" }` override would actually take effect (confirmed by watching `uv lock -v`
+   silently never touch the custom index until this was done). Cut `uv.lock` from 155 to
+   119 packages even before the bigger fix below.
+2. **Even CPU-only torch didn't leave enough headroom.** With the CUDA stack gone, a
+   single `uvicorn` process still sat at ~98% of 512MB just from importing the RAG module
+   chain, before serving a request - confirmed by running `uvicorn` alone (no background
+   job at all) in the capped container and watching it plateau there. Running fetch/build
+   as a *second* concurrent process (from Failure 2/3's fix) made this strictly worse by
+   double-loading the same stack, but a single process alone already had no slack to fix
+   into. The real constraint was the dependency stack itself, not the process architecture.
+
+**Fix:** replaced local embeddings (`sentence-transformers`) and the local cross-encoder
+reranker (M3) with Gemini's embeddings API (`GoogleGenerativeAIEmbeddings`,
+`gemini-embedding-001`) - removing `torch`/`transformers`/`sentence-transformers` from the
+dependency tree entirely. Verified in the same 512MB-capped container: steady-state memory
+dropped to 65-80%, image size 1.52GB → 686MB.
+
+**Real finding, not anticipated:** Gemini's free tier turned out to cap `embed_content` at
+*both* 100 requests/minute *and* 1000 requests/day - discovered by watching
+`build_index.py` retry-and-fail against the same daily quota no matter how long its
+per-minute backoff waited, then confirmed directly by calling the embeddings API with
+increasing batch sizes until it 429'd. **Fix:** batch and pace `build_index.py`'s calls
+(instead of one big `Chroma.from_documents()` call) to stay under the per-minute cap, with
+retry-with-backoff for that cap and a fast-fail (no point retrying) once the error message
+identifies the *daily* quota specifically, since no realistic backoff clears that one.
+
+**Failure 5 (a correctness bug, found by using the deployed app, not a deploy failure):**
+`search_fastapi_docs` only guarded against a missing doc corpus (the cold-start case from
+M9) - it didn't catch an exception from the embedding call itself. Since `/chat`
+(`api/main.py`) has no top-level try/except around the agent graph invocation, the daily
+quota above being exhausted meant any question needing doc search 500'd outright, while a
+question the LLM could answer without a tool call worked fine - a distinction that looked
+like a mystery ("why does this question fail and not that one?") until traced to which
+questions actually trigger a tool call. **Fix:** catch retrieval exceptions inside the tool
+itself and return a plain-text fallback, same pattern as the cold-start guard already had.
+**Lesson generalized:** every tool that reaches an external API needs its own error
+handling, since nothing upstream of it will catch a failure gracefully.
 
 ## Known limitations (tracked honestly, not hidden)
 
@@ -216,6 +292,10 @@ shortly" message during that window rather than erroring.
   get fallback/rate-limiting, since those are baked into the model objects themselves).
 - No automated `pytest` suite — verification has been the eval harness plus deliberate
   manual/browser-driven testing at every step, not unit tests.
+- Gemini's free-tier embeddings quota (100/minute, 1000/day, M11) means doc search is
+  genuinely unavailable - not just slower - once the daily cap is hit, until it resets.
+- Eval scores above were measured against the cross-encoder-reranked retrieval pipeline,
+  before M11 dropped the reranker for memory reasons - not yet re-run since.
 
 ## How to run it
 
