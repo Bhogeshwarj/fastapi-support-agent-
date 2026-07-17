@@ -1,26 +1,32 @@
 """Hybrid search: merges Chroma vector search with BM25 keyword search via
 Reciprocal Rank Fusion (RRF, handled internally by EnsembleRetriever).
+
+Embeddings go through Google's Gemini API rather than a local
+sentence-transformers model: a local model drags in torch + transformers,
+whose import footprint alone doesn't fit Render's 512MB free-tier container
+(measured: a single process importing that stack sat at ~98% of the limit
+before serving a single request). The API call trades a small amount of
+per-query latency for cutting that dependency out entirely. Cross-encoder
+reranking (previously HuggingFaceCrossEncoder) is dropped for the same
+reason - RRF-merged hybrid ranking is used as-is, just trimmed to top_n.
 """
 
 from pathlib import Path
 
 from langchain_classic.retrievers import EnsembleRetriever
-from langchain_classic.retrievers.contextual_compression import ContextualCompressionRetriever
-from langchain_classic.retrievers.document_compressors import CrossEncoderReranker
 from langchain_chroma import Chroma
-from langchain_community.cross_encoders import HuggingFaceCrossEncoder
 from langchain_community.retrievers import BM25Retriever
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_core.runnables import Runnable, RunnableLambda
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
 from fastapi_support_agent.rag.chunking import load_and_chunk_docs
 
 PERSIST_DIR = Path(__file__).resolve().parents[3] / "data" / "vector_store" / "chroma"
-EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+EMBEDDING_MODEL = "gemini-embedding-001"
 
 
 def build_hybrid_retriever(k: int = 5) -> EnsembleRetriever:
-    embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
+    embeddings = GoogleGenerativeAIEmbeddings(model=EMBEDDING_MODEL)
     vector_db = Chroma(
         persist_directory=str(PERSIST_DIR),
         embedding_function=embeddings,
@@ -38,9 +44,7 @@ def build_hybrid_retriever(k: int = 5) -> EnsembleRetriever:
     return EnsembleRetriever(retrievers=[vector_retriever, bm25_retriever], weights=[0.5, 0.5])
 
 
-def build_reranked_retriever(top_n: int = 4, k: int = 5) -> ContextualCompressionRetriever:
-    """Hybrid search, then rerank the merged candidates and keep only the top_n best."""
+def build_reranked_retriever(top_n: int = 4, k: int = 5) -> Runnable:
+    """Hybrid search, trimmed to the top_n best RRF-ranked candidates."""
     base_retriever = build_hybrid_retriever(k=k)
-    cross_encoder = HuggingFaceCrossEncoder(model_name=RERANKER_MODEL)
-    reranker = CrossEncoderReranker(model=cross_encoder, top_n=top_n)
-    return ContextualCompressionRetriever(base_compressor=reranker, base_retriever=base_retriever)
+    return base_retriever | RunnableLambda(lambda docs: docs[:top_n])
