@@ -29,8 +29,21 @@ def search_fastapi_docs(query: str) -> str:
             "- this takes a minute or two. Please retry shortly."
         )
 
-    retriever = build_reranked_retriever(top_n=4)
-    chunks = retriever.invoke(query)
+    # Embeddings go through Gemini's API (see rag/retrieval.py) - a quota/network
+    # failure here must not crash the whole /chat request with a 500, since
+    # main.py has no try/except around the agent graph invocation.
+    try:
+        retriever = build_reranked_retriever(top_n=4)
+        chunks = retriever.invoke(query)
+    except Exception as e:
+        if "RESOURCE_EXHAUSTED" in str(e):
+            return (
+                "Documentation search is temporarily rate-limited (embedding "
+                "API quota). Please retry in a bit, or ask without needing "
+                "doc lookup."
+            )
+        return f"Documentation search is temporarily unavailable ({type(e).__name__}). Please retry shortly."
+
     if not chunks:
         return "No relevant documentation found."
 
